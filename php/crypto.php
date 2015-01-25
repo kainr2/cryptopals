@@ -10,38 +10,19 @@ class XorStrItem
 
 class XorByteItem
 {
-  var $input_str;
-  var $xor_byte;
-  var $output_str;
+  var $input_str  = "";
+  var $xor_byte   = "";
+  var $output_str = "";
 
-  var $vowel_count;
-  var $alphanum_count;
-  var $space_count;
-  var $nonchar_count;
+  var $vowel_count    = 0;
+  var $alphanum_count = 0;
+  var $wspace_count   = 0;
+  var $nonchar_count  = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 class XorAlgo
 {
-  //----------------------------------------------------------------------------
-  // public function xor_byte($input_str, $xor_byte) 
-  // {
-
-  //   //Check for amount of vowels...
-  //   $matches = array();
-  //   preg_match_all("/[aeiouy]/i", $output, $matches);
-  //   $nvowels = count($matches[0]);
-
-  //   preg_match_all("/[a-z0-9]/i", $output, $matches);
-  //   $nchars = count($matches[0]);
-
-  //   preg_match_all("/[\s]/", $output, $matches);
-  //   $nspaces = count($matches[0]);
-
-  //   preg_match_all("/[\x01-\x1F\x7F-\xFF]/", $output, $matches);
-  //   $nnotprint = count($matches[0]);    
-  // }
-
   //----------------------------------------------------------------------------
   // XOR the two string and return the value
   // @param[in] rawstr1  String 1
@@ -59,6 +40,8 @@ class XorAlgo
     for($i=0; $i<strlen($rawstr1); $i++) 
     {
       $xor3[$i] = $rawstr1[$i] ^ $rawstr2[$i];
+      //printf("a(%3d) ^ b(%3d) = %3d\n", 
+      //  ord($rawstr1[$i]), ord($rawstr2[$i]), ord($xor3[$i]));
     }
 
     return implode($xor3);
@@ -67,7 +50,7 @@ class XorAlgo
   //----------------------------------------------------------------------------
   // XOR the string with the given integer
   // @param[in] rawstr  A string of raw value
-  // @param[in] xint  An integer to xor with
+  // @param[in] xint  A raw value to xor with
   // @return  A character-string of XOR-ed 
   public function xor_str_int($rawstr, $xint)
   {
@@ -81,23 +64,31 @@ class XorAlgo
   }
 
   //----------------------------------------------------------------------------
-  private function char_freq($input)
+  public function analyze_xor($input, $xint, $output) 
   {
-    // Convert each into decimal, and count..
-    $counter = array();
-    foreach (str_split($input,1) as $value)
-    {
-      if (array_key_exists($value, $counter)) {
-        $counter[$value]++;
-      } else {
-        $counter[$value]=1;
-      }
-    }
-    return $counter;
+    $retval = new XorByteItem();
+    $retval->input_str  = $input;
+    $retval->xor_byte   = $xint;
+    $retval->output_str = $output;
+
+    //Check for amount of vowels...
+    $matches = array();
+    preg_match_all("/[aeiouy]/i", $output, $matches);
+    $retval->vowel_count = count($matches[0]);
+
+    preg_match_all("/[a-z0-9]/i", $output, $matches);
+    $retval->alphanum_count = count($matches[0]);
+
+    preg_match_all("/[\s]/", $output, $matches);
+    $retval->wspace_count = count($matches[0]);
+
+    preg_match_all("/[\x01-\x1F\x7F-\xFF]/", $output, $matches);
+    $retval->nonchar_count = count($matches[0]);
+
+    return $retval;
   }
+
   //----------------------------------------------------------------------------
-
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -140,43 +131,35 @@ function s1c3()
   echo "input  = $input\n";
   echo "packed = $hex_input\n";
 
-
-  $keys = range(0,0);
-  foreach ($keys as $key)
+  // Try xor-ing from 0 to 255
+  $stat = Array();
+  foreach (range(0,255) as $key)
   {
+    // Convert decimal to hex value(string) and pack() to real hex-format
+    // * http://stackoverflow.com/questions/5799399/php5-pack-is-broken-on-x84-64-env
     $hex_key = pack("H*", dechex($key));
     $hex_out = $algo->xor_str_int($hex_input, $hex_key);
+    $output  = implode(unpack("H*", $hex_out));
 
+    // var_dump($key);
+    // var_dump($hex_out);
+    // var_dump($output);
 
-    $output = implode(unpack("H*", $hex_out));
-    var_dump($hex_key);
-    var_dump($hex_out);
-    var_dump($output);
+    // Analyze the output to see if it's a legit string.
+    $item = $algo->analyze_xor($input, $key, $hex_out);
 
-
-    //Check for amount of vowels...
-    // $matches = array();
-    // preg_match_all("/[aeiouy]/i", $output, $matches);
-    // $nvowels = count($matches[0]);
-
-    // preg_match_all("/[a-z0-9]/i", $output, $matches);
-    // $nchars = count($matches[0]);
-
-    // preg_match_all("/[\s]/", $output, $matches);
-    // $nspaces = count($matches[0]);
-
-    // preg_match_all("/[\x01-\x1F\x7F-\xFF]/", $output, $matches);
-    // $nnotprint = count($matches[0]);
-
-    // if ($nvowels>0 && $nspaces>0 && $nnotprint==0) {
-    //   echo "output($key)($nvowels)($nchars)($nspaces)($nnotprint) = $output\n";
-    // }
+    // Use the most simple analysis -- some vowels and spaces
+    if ($item->nonchar_count == 0 && $item->vowel_count > 0
+    &&  $item->wspace_count > 0) 
+    {
+      array_push($stat, $item);
+      printf("key(%d) = %s\n", $item->xor_byte, $item->output_str);
+    }
   }
-
 
 }
 
-
+////////////////////////////////////////////////////////////////////////////////
 echo "--------------------\n";
 echo "Set 1 Challenge 1\n";
 s1c1();
