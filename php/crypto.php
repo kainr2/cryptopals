@@ -172,5 +172,9 @@ echo "--------------------\n";
 echo "Set 1 Challenge 3\n";
 s1c3();
 
+echo "--------------------\n";
+echo "Set 1 Challenge 4\n";
+
+
 
 ?>
