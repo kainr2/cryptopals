@@ -1,23 +1,54 @@
 <?php
 
-///////////////////////////////////////////////////////////////////////////////
-class XorStrItem
-{
-  var $input_str;
-  var $xor_str;
-  var $output_str;
-}
 
+///////////////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------------
+// A struct for storing information
 class XorByteItem
 {
   var $input_str  = "";
   var $xor_byte   = "";
   var $output_str = "";
+  var $point = 0;
+}
 
-  var $vowel_count    = 0;
-  var $alphanum_count = 0;
-  var $wspace_count   = 0;
-  var $nonchar_count  = 0;
+////////////////////////////////////////////////////////////////////////////////
+class StringFreqJudge
+{
+  // http://en.wikipedia.org/wiki/Letter_frequency
+  var $freq_table = Array(
+    'a' => 8.167,   'b' => 1.492,   'c' => 2.782,
+    'd' => 4.253,   'e' => 12.702,  'f' => 2.228,
+    'g' => 2.015,   'h' => 6.094,   'i' => 6.966,
+    'j' => 0.153,   'k' => 0.772,   'l' => 4.025,
+    'm' => 2.406,   'n' => 6.749,   'o' => 7.507,
+    'p' => 1.929,   'q' => 0.095,   'r' => 5.987,
+    's' => 6.327,   't' => 9.056,   'u' => 2.758,
+    'v' => 0.978,   'w' => 2.360,   'x' => 0.150,
+    'y' => 1.974,   'z' => 0.074,   ' ' => 10.0
+  );
+
+  //----------------------------------------------------------------------------
+  // Generate the point based on the alphabet frequency.
+  // @param[in] instr  A string to measure.
+  // @return  Point value, up to 3 decimal pt
+  public function compute_point($instr)
+  {
+    $total_pt = 0;
+    $input2 = strtolower($instr);
+    foreach (str_split($input2) as $char)
+    {
+      // If it does not exist in the table, next!
+      if (!array_key_exists($char, $this->freq_table)) {
+        continue;
+      }
+
+      $total_pt += $this->freq_table[$char];
+    }
+
+    // Total point
+    return $total_pt;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -25,8 +56,8 @@ class XorAlgo
 {
   //----------------------------------------------------------------------------
   // XOR the two string and return the value
-  // @param[in] rawstr1  String 1
-  // @param[in] rawstr2  String 2
+  // @param[in] rawstr1  String 1 in binary format
+  // @param[in] rawstr2  String 2 in binary format
   // @return XOR-ed string. Return -1 on error.
   public function xor_str_str($rawstr1, $rawstr2)
   {
@@ -49,45 +80,123 @@ class XorAlgo
 
   //----------------------------------------------------------------------------
   // XOR the string with the given integer
-  // @param[in] rawstr  A string of raw value
-  // @param[in] xint  A raw value to xor with
-  // @return  A character-string of XOR-ed 
-  public function xor_str_int($rawstr, $xint)
+  // @param[in] rawstr  A string in binary format
+  // @param[in] rawint  An int to xor in binary format
+  // @return  A binary-string that has been XOR-ed 
+  public function xor_str_int($rawstr, $rawint)
   {
     $output = Array();
     for($i=0; $i<strlen($rawstr); $i++)
     {
-      $output[$i] = $rawstr[$i] ^ $xint;
-      //echo "raw(" . ord($rawstr[$i]) . ") ^ xint(" . ord($xint) . ") = " . ord($output[$i]) . "\n";
+      $output[$i] = $rawstr[$i] ^ $rawint;
+      //echo "raw(" . ord($rawstr[$i]) . ") ^ rawint(" . ord($rawint) . ") = " . ord($output[$i]) . "\n";
     }
     return implode($output);
   }
 
   //----------------------------------------------------------------------------
-  public function analyze_xor($input, $xint, $output) 
+  // Given an array of string(binary-format), XOR and search for ones 
+  // closet to a real string.
+  // @param[in] input_list  A list of string(binary format) to be xor
+  // @param[in] max_candidate  The max amount of candidates to consider
+  // @return  Top candidates of valid string
+  public function xorsearch_list_int($input_list, $max_candidate) 
   {
-    $retval = new XorByteItem();
-    $retval->input_str  = $input;
-    $retval->xor_byte   = $xint;
-    $retval->output_str = $output;
+    // Top candidate list, and min point to be in the list
+    $judge = new StringFreqJudge();
+    $top_list = Array();  // XorByteItem[]
 
-    //Check for amount of vowels...
-    $matches = array();
-    preg_match_all("/[aeiouy]/i", $output, $matches);
-    $retval->vowel_count = count($matches[0]);
+    // Error check the size
+    if (empty($max_candidate) || $max_candidate < 3) {
+      $max_candidate = 3;
+    }
 
-    preg_match_all("/[a-z0-9]/i", $output, $matches);
-    $retval->alphanum_count = count($matches[0]);
+    // For each string...
+    foreach ($input_list as $input_str)
+    {
+      foreach (range(0,88) as $key)
+      {
+        // Convert decimal to hex value(string) and pack() to binary format.
+        // * http://stackoverflow.com/questions/5799399/php5-pack-is-broken-on-x84-64-env
+        $bin_key = pack("H*", dechex($key));  // decbin()
+        $bin_out = $this->xor_str_int($input_str, $bin_key);
+        $output_str = implode(unpack("H*", $bin_out));  // bindec()
 
-    preg_match_all("/[\s]/", $output, $matches);
-    $retval->wspace_count = count($matches[0]);
+        // Compute the relevant point, and skip if not matching the standard.
+        $point = $judge->compute_point($bin_out);
 
-    preg_match_all("/[\x01-\x1F\x7F-\xFF]/", $output, $matches);
-    $retval->nonchar_count = count($matches[0]);
+        // Create the item
+        $item = new XorByteItem();
+        $item->input_str  = $input_str;
+        $item->xor_byte   = $key;
+        $item->output_str = $output_str;
+        $item->point = $point;
 
-    return $retval;
+        // Update top_list
+        $top_list = $this->add_to_top_list($top_list, $max_candidate, $item);
+      }
+
+    }
+
+    return $top_list;
   }
 
+  //----------------------------------------------------------------------------
+  // Logic to add a new element to top_list (or not)
+  // @param[in] top_list  A list of XorByteItem with highest point
+  // @param[in] max_candidate  The max amount of candidates to consider
+  // @param[in] item  The element to compare with top_list
+  // @return  Top candidates of highest point
+  private function add_to_top_list($top_list, $max_candidate, $item)
+  {
+    $top_list_size = count($top_list);
+
+    // (1) If top_list is empty, add and return.
+    if ($top_list_size == 0) 
+    {
+      array_push($top_list, $item);
+      return $top_list;
+    }
+
+    // (2) Search for the place to insert.
+    //     Loop through until finding the place to insert.
+    $curr_pos = 0;
+    for ($i=0; $i<$top_list_size; $i++) 
+    {
+      if ($item->point <= $top_list[$i]->point) 
+      {
+        break;
+      }
+
+      $curr_pos++;
+    }
+
+    // (3) Otherwise, find the place to insert.
+    // * If least qualify point, add to the start of top_list
+    if ($curr_pos == 0) {
+      array_unshift($top_list, $item);
+    } 
+    // * If highest point, add to the end of top_list
+    else if ($curr_pos == $top_list_size) {
+      array_push($top_list, $item);
+    }
+    // * Otherwise, split the array into two parts -- 0 to curr_pos, and curr_pos+1 to N
+    else {
+      $start = array_slice($top_list, 0, $curr_pos);
+      $end   = array_slice($top_list, $curr_pos);
+      $top_list = array_merge($start, array($item), $end);
+    }
+
+    // (4) If overfilled, remove the start of top_list
+    if (count($top_list) > $max_candidate) {
+      array_shift($top_list);
+    }
+
+    return $top_list;
+  }
+
+
+  
   //----------------------------------------------------------------------------
 }
 
@@ -122,7 +231,6 @@ function s1c2()
 
 }
 
-
 function s1c3()
 {
   $algo = new XorAlgo();
@@ -131,30 +239,11 @@ function s1c3()
   echo "hex_input = $hex_str\n";
   echo "bin_input = $bin_str\n";
 
-  // Try xor-ing from 0 to 255
-  $stat = Array();
-  foreach (range(0,255) as $key)
+
+  $top_list = $algo->xorsearch_list_int(array($bin_str), 3);
+  foreach ($top_list as $item) 
   {
-    // Convert decimal to hex value(string) and pack() to binary-format
-    // * http://stackoverflow.com/questions/5799399/php5-pack-is-broken-on-x84-64-env
-    $bin_key = pack("H*", dechex($key));   // decbin()
-    $bin_out = $algo->xor_str_int($bin_str, $bin_key);
-    $hex_out = implode(unpack("H*", $bin_out));
-
-    // var_dump($key);
-    // var_dump($bin_out);
-    // var_dump($hex_out);
-
-    // Analyze the output to see if it's a legit string.
-    $item = $algo->analyze_xor($hex_str, $key, $bin_out);
-
-    // Use the most simple analysis -- some vowels and spaces
-    if ($item->nonchar_count == 0 && $item->vowel_count > 0
-    &&  $item->wspace_count > 0) 
-    {
-      array_push($stat, $item);
-      printf("key(%d) = %s\n", $item->xor_byte, $item->output_str);
-    }
+    printf("key(%d);point(%d) = %s\n", $item->xor_byte, $item->point, hex2bin($item->output_str));
   }
 
 }
