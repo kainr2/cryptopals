@@ -25,7 +25,7 @@ class StringFreqJudge
     'p' => 1.929,   'q' => 0.095,   'r' => 5.987,
     's' => 6.327,   't' => 9.056,   'u' => 2.758,
     'v' => 0.978,   'w' => 2.360,   'x' => 0.150,
-    'y' => 1.974,   'z' => 0.074,   ' ' => 10.0
+    'y' => 1.974,   'z' => 0.074,   ' ' => 12.0
   );
 
   //----------------------------------------------------------------------------
@@ -111,16 +111,22 @@ class XorAlgo
       $max_candidate = 3;
     }
 
-    // For each string...
+    // For each string XOR with each integer 
     foreach ($input_list as $input_str)
     {
-      foreach (range(0,88) as $key)
+      foreach (range(0,255) as $key)
       {
         // Convert decimal to hex value(string) and pack() to binary format.
         // * http://stackoverflow.com/questions/5799399/php5-pack-is-broken-on-x84-64-env
         $bin_key = pack("H*", dechex($key));  // decbin()
         $bin_out = $this->xor_str_int($input_str, $bin_key);
         $output_str = implode(unpack("H*", $bin_out));  // bindec()
+
+        // If contain non-printable chars, skip it
+        $matches = array();
+        if (preg_match_all("/[\x01-\x1F\x7F-\xFF]/", $bin_out, $matches) > 0) {
+          continue;
+        }
 
         // Compute the relevant point, and skip if not matching the standard.
         $point = $judge->compute_point($bin_out);
